@@ -1,0 +1,331 @@
+C51 COMPILER V9.54   LCD12864                                                              12/07/2019 19:44:11 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE LCD12864
+OBJECT MODULE PLACED IN .\Objects\lcd12864.obj
+COMPILER INVOKED BY: D:\DevelopmentTools\Keil\C51\BIN\C51.EXE ..\modules\src\lcd12864.c LARGE OPTIMIZE(8,SPEED) BROWSE I
+                    -NCDIR(..\core;..\modules\inc;..\system\inc) DEBUG OBJECTEXTEND PRINT(.\Listings\lcd12864.lst) OBJECT(.\Objects\lcd12864.
+                    -obj)
+
+line level    source
+
+   1          /*
+   2           * @Descripttion: lcd12864初始化配置及显示程序
+   3           * @version: 1.0
+   4           * @Author: adol
+   5           * @Date: 2019-11-19 12:45:50
+   6           * @LastEditors: adol
+   7           * @LastEditTime: 2019-11-22 20:32:19
+   8           */
+   9          
+  10          #include "intrins.h"
+  11          #include "core.h"
+  12          
+  13          bit flag_lcd12864_display_ok = 0;
+  14          unsigned char lcd12864_display_buffer[4][16] = {"北斗定位", "xx.xxx xxx.xx", "--时--分--秒", "20--年--月--
+             -日"};
+  15          
+  16          /**
+  17           * @name: lcd12864_busy_test();
+  18           * @function: 检测液晶是否处于忙状态
+  19           * @param { void } 
+  20           * @return: 0 : 液晶未处于忙状态,可进行操作; 1 : 液晶处于忙状态,不可进行操作
+  21           */
+  22          unsigned char lcd12864_busy_test(void)
+  23          {
+  24   1          unsigned char temp;
+  25   1          lcd12864_rs(0);     //RS=0，RW=1, 从液晶读取数据
+  26   1          lcd12864_rw(1);
+  27   1          lcd12864_en(1);
+  28   1          lcd12864_delay_ms(1);
+  29   1          temp = lcd12864_data_port & (0x80);
+  30   1          lcd12864_en(0);
+  31   1          return temp;
+  32   1      }
+  33          
+  34          /**
+  35           * @name: send_cmd_to_lcd12864();
+  36           * @function: 向液晶发送指令
+  37           * @param { unsigned char } cmd -> 要发送的指令
+  38           * @return: none
+  39           */
+  40          void send_cmd_to_lcd12864(unsigned char cmd)
+  41          {
+  42   1          while(lcd12864_busy_test());
+  43   1          lcd12864_rs(0);     //RS=0, RW=0, 向液晶发送命令
+  44   1          lcd12864_rw(0);
+  45   1          lcd12864_data_port = cmd;
+  46   1          lcd12864_en(1);
+  47   1          _nop_();
+  48   1          _nop_();
+  49   1          _nop_();
+  50   1          _nop_();
+  51   1          _nop_();
+  52   1          _nop_();
+C51 COMPILER V9.54   LCD12864                                                              12/07/2019 19:44:11 PAGE 2   
+
+  53   1          _nop_();
+  54   1          _nop_();
+  55   1          lcd12864_en(0);
+  56   1      }
+  57          
+  58          /**
+  59           * @name: send_data_to_lcd12864();
+  60           * @function: 向液晶发送数据
+  61           * @param { unsigned char } dat -> 要发送的数据
+  62           * @return: none
+  63           */
+  64          void send_data_to_lcd12864(unsigned char dat)
+  65          {
+  66   1          while(lcd12864_busy_test());
+  67   1          lcd12864_rs(1);     //RS=1, RW=0, 向液晶发送数据
+  68   1          lcd12864_rw(0);
+  69   1          lcd12864_data_port = dat;
+  70   1          lcd12864_en(1);
+  71   1          _nop_();
+  72   1          _nop_();    
+  73   1          _nop_();
+  74   1          _nop_();
+  75   1          _nop_();
+  76   1          _nop_();
+  77   1          _nop_();
+  78   1          _nop_();
+  79   1          lcd12864_en(0);
+  80   1      }
+  81          
+  82          /**
+  83           * @name: lcd12864_jump_place(char row,char column);
+  84           * @function: "常规显示模式"下显示坐标跳转至指定行和列
+  85           * @param { unsigned char } row    -> 常规显示模式下12864液晶四行中的一行,参数设定范围为 1~4
+  86           *                          column -> 常规显示模式下12864液晶八列中的一列,参数设定范围为 1~8
+  87           * @return: none
+  88           */
+  89          void lcd12864_jump_place(unsigned char row, unsigned char column)    
+  90          {
+  91   1          send_cmd_to_lcd12864(0x30);
+  92   1          switch(row)
+  93   1          {
+  94   2              case 1: send_cmd_to_lcd12864(0x80 + column - 1); break;
+  95   2              case 2: send_cmd_to_lcd12864(0x90 + column - 1); break;
+  96   2              case 3: send_cmd_to_lcd12864(0x88 + column - 1); break;
+  97   2              case 4: send_cmd_to_lcd12864(0x98 + column - 1); break;
+  98   2          }
+  99   1      }
+ 100          
+ 101          /**
+ 102           * @name: lcd12864_printf_string();
+ 103           * @function: 常规显示模式下 "以液晶指定行和列坐标为起点" 显示一串字符,只可进行单行显示
+ 104           * @param { unsigned char } row -> 常规显示模式下12864液晶四行中的一行,参数设定范围为 1~4
+ 105           *                          column -> 常规显示模式下12864液晶八列中的一列,参数设定范围为 1~8
+ 106           *                          add -> 字符串首地址
+ 107           * @return: none
+ 108           */
+ 109          void lcd12864_printf_string(unsigned char row, unsigned char column, unsigned char *add)  
+ 110          {
+ 111   1          unsigned char *temp = add;
+ 112   1          // unsigned char* temp = add;
+ 113   1          lcd12864_jump_place(row, column);
+ 114   1          while((*temp != '\0'))
+C51 COMPILER V9.54   LCD12864                                                              12/07/2019 19:44:11 PAGE 3   
+
+ 115   1          {
+ 116   2              send_data_to_lcd12864(*temp++);
+ 117   2          }
+ 118   1      }
+ 119          
+ 120          /**
+ 121           * @name: lcd12864_clear();
+ 122           * @function: 常规显示模式下 液晶清屏
+ 123           * @param { void } 
+ 124           * @return: none
+ 125           */
+ 126          // void lcd12864_clear(void)
+ 127          // {
+ 128          //   lcd12864_printf_string(1,1,"                ");
+ 129          //   lcd12864_printf_string(2,1,"                ");
+ 130          //   lcd12864_printf_string(3,1,"                ");
+ 131          //   lcd12864_printf_string(4,1,"                ");
+ 132          // }
+ 133          
+ 134          /*******************************************************************************
+ 135          函数调用方法 -> 
+ 136              函数功能 -> 
+ 137                   
+ 138                返回值 -> 无
+ 139          使用本函数时请参考12864液晶 "图形显示坐标"
+ 140          *******************************************************************************/
+ 141          /**
+ 142           * @name: lcd12864_picture_mode_jump_place();
+ 143           * @function: "绘图模式"下显示坐标跳转至指定行和列
+ 144           * @param { unsigned char } row    -> "绘图模式"下12864液晶 64 行中的一行,参数设定范围为 1~64
+ 145                                      column -> "绘图模式"下12864液晶 8  列中的一列,参数设定范围为 1~8
+ 146           * @return: none
+ 147           */
+ 148          // void lcd12864_picture_mode_jump_place(unsigned char row, unsigned char column)  
+ 149          // {
+ 150          //     char temp;
+ 151          //     if(row >= 1 && row <= 64 && column >= 1 && column <= 8)
+ 152          //     {
+ 153          //         send_cmd_to_lcd12864(0x34);
+ 154          //         if(row <= 32)
+ 155          //         {
+ 156          //             temp = row;
+ 157          //         }
+ 158          //         else
+ 159          //         {
+ 160          //             temp = row-32;
+ 161          //         }
+ 162          //         send_cmd_to_lcd12864(0x80 + temp -1);
+ 163                  
+ 164          //         if(row <= 32)
+ 165          //         {
+ 166          //             send_cmd_to_lcd12864(0x80 + column -1);
+ 167          //         }
+ 168          //         else
+ 169          //         {
+ 170          //             send_cmd_to_lcd12864(0x88 + column -1);
+ 171          //         }
+ 172                  
+ 173          //     }
+ 174          // }
+ 175          
+ 176          /**
+C51 COMPILER V9.54   LCD12864                                                              12/07/2019 19:44:11 PAGE 4   
+
+ 177           * @name: lcd12864_picture_mode_print();
+ 178           * @function: "绘图模式"下 "以指定行(row)和列(column)为起点" 显示分辨率为 width(宽) * height(高)的单色位图
+ 179           * @param { unsigned char } row -> "绘图模式"下12864液晶 64 行中的一行,参数设定范围为 1~64
+ 180                                      column -> "绘图模式"下12864液晶 8  列中的一列,参数设定范围为 1~8
+ 181                                      width -> 单色位图的宽度，必须为16的整数倍，数值范围 1~128
+ 182                                      height -> 单色位图的高度，数值范围 1~64
+ 183                                      reverse_flag -> 反白显示标志位，0:常规显示;1:反白显示
+ 184           * @return: none
+ 185           */
+ 186          // void lcd12864_picture_mode_print(unsigned char row, unsigned char column,
+ 187          //                                  unsigned char width, unsigned char height,
+ 188          //                                  unsigned char reverse_flag, unsigned char* add)
+ 189          // {
+ 190          //     unsigned char *temp = add;
+ 191          //     unsigned char i = 0, j = 0, k = 0;
+ 192          //     k = width / 16;
+ 193          //     if(reverse_flag)
+ 194          //     {
+ 195          //         for(i = 0; i < height; i++)
+ 196          //         {
+ 197          //             lcd12864_picture_mode_jump_place(row+i, column);
+ 198          //             for(j = 0 ;j < k; j++)
+ 199          //             {
+ 200          //                 send_data_to_lcd12864(~(*temp++));
+ 201          //                 send_data_to_lcd12864(~(*temp++));
+ 202          //             }
+ 203          //         }
+ 204          //     }
+ 205          //     else
+ 206          //     {
+ 207          //         for(i = 0; i < height; i++)
+ 208          //         {
+ 209          //             lcd12864_picture_mode_jump_place(row + i, column);
+ 210          //             for(j = 0; j < k; j++)
+ 211          //             {
+ 212          //                 send_data_to_lcd12864(*temp++);
+ 213          //                 send_data_to_lcd12864(*temp++);
+ 214          //             }
+ 215          //         }
+ 216          //     }
+ 217          //     send_cmd_to_lcd12864(0x36);
+ 218          //     send_cmd_to_lcd12864(0x30);
+ 219          // }
+ 220          
+ 221          
+ 222          /**
+ 223           * @name: lcd12864_picture_mode_clear();
+ 224           * @function: 绘图模式下 液晶清屏
+ 225           * @param { void } 
+ 226           * @return: none
+ 227           */
+ 228          // void lcd12864_picture_mode_clear(void)
+ 229          // {
+ 230          //     unsigned char i = 0,j = 0;
+ 231          //     for(i = 0;i < 64; i++)
+ 232          //     {
+ 233          //         lcd12864_picture_mode_jump_place(i + 1, 1);
+ 234          //         for(j = 0; j < 8; j++)
+ 235          //         {
+ 236          //             send_data_to_lcd12864(0x00);
+ 237          //             send_data_to_lcd12864(0x00);
+ 238          //         }
+C51 COMPILER V9.54   LCD12864                                                              12/07/2019 19:44:11 PAGE 5   
+
+ 239          //     }
+ 240          // }
+ 241          
+ 242          /**
+ 243           * @name: lcd12864_control_port_init();
+ 244           * @function: 设置单片机连接液晶控制端口的IO为输出模式
+ 245           * @param { void } 
+ 246           * @return: none
+ 247           */
+ 248          // void lcd12864_control_port_init(void)
+ 249          // {
+ 250          //   #ifdef lcd12864_res_pin
+ 251          //     lcd12864_res(1);
+ 252          //   #endif
+ 253          //   #ifdef lcd12864_psb_pin
+ 254          //     lcd12864_psb(1);         //确定液晶控制方式为并行
+ 255          //   #endif
+ 256          // }
+ 257          
+ 258          /**
+ 259           * @name: lcd12864_init();
+ 260           * @function: 液晶初始化设置，使用其他函数前请先调用此函数
+ 261           * @param { void } 
+ 262           * @return: none
+ 263           */
+ 264          void lcd12864_init(void)
+ 265          {
+ 266   1          send_cmd_to_lcd12864(0x30); /*使用8位并口通讯*/
+ 267   1          lcd12864_delay_ms(10);
+ 268   1          send_cmd_to_lcd12864(0x30); /*使用8位并口通讯*/
+ 269   1          lcd12864_delay_ms(10);
+ 270   1          send_cmd_to_lcd12864(0x0c); /*显示开及光标设置*/
+ 271   1          lcd12864_delay_ms(10);
+ 272   1          send_cmd_to_lcd12864(0x01); /*显示清屏*/
+ 273   1          lcd12864_delay_ms(30);
+ 274   1          send_cmd_to_lcd12864(0x06); /*DDRAM的地址计数器（AC）加1*/
+ 275   1          lcd12864_delay_ms(30);
+ 276   1      }
+ 277          
+ 278          /**
+ 279           * @name: lcd12864_display();
+ 280           * @function: lcd12864显示程序
+ 281           * @param { void } 
+ 282           * @return: none
+ 283           */
+ 284          void lcd12864_display(void)
+ 285          {
+ 286   1          if (flag_lcd12864_display_ok == 0)
+ 287   1          {
+ 288   2              lcd12864_printf_string(1, 1, lcd12864_display_buffer[0]);
+ 289   2              lcd12864_printf_string(2, 1, lcd12864_display_buffer[1]);
+ 290   2              lcd12864_printf_string(3, 1, lcd12864_display_buffer[2]);
+ 291   2              lcd12864_printf_string(4, 1, lcd12864_display_buffer[3]);
+ 292   2          }
+ 293   1          
+ 294   1          flag_lcd12864_display_ok = 1;
+ 295   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    323    ----
+   CONSTANT SIZE    =   ----    ----
+C51 COMPILER V9.54   LCD12864                                                              12/07/2019 19:44:11 PAGE 6   
+
+   XDATA SIZE       =     64       7
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      1    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

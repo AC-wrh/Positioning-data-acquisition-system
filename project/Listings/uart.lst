@@ -1,0 +1,144 @@
+C51 COMPILER V9.54   UART                                                                  11/29/2019 20:24:09 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE UART
+OBJECT MODULE PLACED IN .\Objects\uart.obj
+COMPILER INVOKED BY: D:\DevelopmentTools\Keil\C51\BIN\C51.EXE ..\system\src\uart.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR
+                    -(..\core;..\modules\inc;..\system\inc) DEBUG OBJECTEXTEND PRINT(.\Listings\uart.lst) OBJECT(.\Objects\uart.obj)
+
+line level    source
+
+   1          /*
+   2           * @Descripttion: 串口初始化及配置
+   3           * @version: 1.0
+   4           * @Author: adol
+   5           * @Date: 2019-11-19 12:46:01
+   6           * @LastEditors: adol
+   7           * @LastEditTime: 2019-11-29 20:18:52
+   8           */
+   9          
+  10          #include "intrins.h"
+  11          #include "core.h"
+  12          
+  13          bit flag_gps_data_ok = 0;
+  14          bit uart_busy;
+  15          unsigned char RX_count = 0;
+  16          unsigned char RX_buffer[70];
+  17          
+  18          /**
+  19           * @name: uart_init();
+  20           * @function: 串口1初始化
+  21           * @param { void } 
+  22           * @return: none
+  23           */
+  24          void uart_init(void)
+  25          {
+  26   1      #if (paritybit == none_parity)
+  27   1          SCON = 0x50;            //8位可变UART
+  28   1      #elif (paritybit == odd_parity) || (paritybit == even_parity) || (paritybit == mark_parity)
+                  SCON = 0xda;            //9位可变UART, 奇偶校验位初始为1
+              #elif (paritybit == space_parity)
+                  SCON = 0xd2;            //9位可变UART, 奇偶校验位初始为0
+              #endif
+  33   1      
+  34   1          PCON &= 0x7F;                           //波特率不倍速
+  35   1          TMOD = 0x20;                            //将Timer1设置为8位自动重载模式
+  36   1          TH1 = TL1 = -(fosc / 12 / 32 / baud);   //设置自动重装值
+  37   1          ET1 = 0;                                //禁止定时器1中断
+  38   1          TR1 = 1;                                //Timer1开始运行
+  39   1          REN = 1;                                //允许串行口接收数据
+  40   1          ES = 1;                                 //启用UART中断
+  41   1          EA = 1;                                 //开启总中断
+  42   1      }
+  43          
+  44          /**
+  45           * @name: uart_isr()
+  46           * @function: 串口中断服务函数
+  47           * @param { void } 
+  48           * @return: none
+  49           */
+  50          void uart_isr(void) interrupt 4 using 1
+  51          {
+  52   1          unsigned char temp = 0;
+  53   1          if (RI)
+  54   1          {
+C51 COMPILER V9.54   UART                                                                  11/29/2019 20:24:09 PAGE 2   
+
+  55   2              // RI = 0;             //清除接收中断标志
+  56   2              // P0 = SBUF;          //接收UART数据
+  57   2      
+  58   2              /***** code *****/
+  59   2              ES=0;
+  60   2              temp = SBUF;
+  61   2              RI = 0;
+  62   2              
+  63   2              if (temp == '$')
+  64   2              {
+  65   3                  RX_count = 0;
+  66   3                  flag_gps_data_ok = 0;
+  67   3              }
+  68   2              
+  69   2              RX_buffer[RX_count++] = temp;
+  70   2              
+  71   2              if(RX_buffer[RX_count - 1] == '*')
+  72   2              {
+  73   3                  RX_count = 69;
+  74   3                  flag_gps_data_ok = 1;
+  75   3              }
+  76   2      
+  77   2              ES=1; 
+  78   2              /***** code *****/
+  79   2          }
+  80   1          if (TI)
+  81   1          {
+  82   2              TI = 0;         //清除发送中断标志
+  83   2              uart_busy = 0;  //清除发送uart_busy标志
+  84   2          }
+  85   1      }
+  86          
+  87          /**
+  88           * @name: uart_send_data();
+  89           * @function: 发送一个字节到串口
+  90           * @param {unsigned char} dat -> 字符
+  91           * @return: none
+  92           */
+  93          void uart_send_data(unsigned char dat)
+  94          {
+  95   1          while (uart_busy);  //等待之前的数据发送完成
+  96   1          ACC = dat;          
+  97   1          uart_busy = 1;
+  98   1          SBUF = ACC;         //发送数据到UART缓冲区
+  99   1      }
+ 100          
+ 101          /**
+ 102           * @name: uart_send_string(char *s)
+ 103           * @function: 发送一个字符串到串口
+ 104           * @param {unsigned char} s -> 字符串地址
+ 105           * @return: none
+ 106           */
+ 107          void uart_send_string(unsigned char *s)
+ 108          {
+ 109   1          while (*s)      //检查字符串的结尾
+ 110   1          {
+ 111   2              uart_send_data(*s++);   //发送当前字符
+ 112   2          }
+ 113   1          uart_send_data('\r');
+ 114   1          uart_send_data('\n');
+ 115   1      }
+ 116          
+C51 COMPILER V9.54   UART                                                                  11/29/2019 20:24:09 PAGE 3   
+
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    190    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =     71       3
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      2    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

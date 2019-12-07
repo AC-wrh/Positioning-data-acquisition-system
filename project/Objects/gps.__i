@@ -1,0 +1,1 @@
+"..\modules\src\gps.c" LARGE OPTIMIZE (8,SPEED) BROWSE INCDIR(..\core;..\modules\inc;..\system\inc) DEBUG OBJECTEXTEND PRINT(.\Listings\gps.lst) OBJECT(.\Objects\gps.obj)

@@ -1,0 +1,59 @@
+C51 COMPILER V9.54   DELAY                                                                 11/29/2019 20:24:09 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE DELAY
+OBJECT MODULE PLACED IN .\Objects\delay.obj
+COMPILER INVOKED BY: D:\DevelopmentTools\Keil\C51\BIN\C51.EXE ..\system\src\delay.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDI
+                    -R(..\core;..\modules\inc;..\system\inc) DEBUG OBJECTEXTEND PRINT(.\Listings\delay.lst) OBJECT(.\Objects\delay.obj)
+
+line level    source
+
+   1          /*
+   2           * @Descripttion: 延时程序
+   3           * @version: 1.0
+   4           * @Author: adol
+   5           * @Date: 2019-11-19 13:04:05
+   6           * @LastEditors: adol
+   7           * @LastEditTime: 2019-11-22 20:34:06
+   8           */
+   9          
+  10          #include "intrins.h"
+  11          #include "core.h"
+  12          
+  13          /**
+  14           * @name: lcd12864_delay_ms();
+  15           * @function: lcd12864的延时函数 单位毫秒
+  16           * @param { unsigned char x } x -> 延时时间
+  17           * @return: none
+  18           */
+  19          void lcd12864_delay_ms(unsigned char x)
+  20          {
+  21   1          unsigned char i, j;
+  22   1      
+  23   1          while (x--)
+  24   1          {
+  25   2              _nop_();
+  26   2              i = 11;
+  27   2              j = 190;
+  28   2      
+  29   2              do
+  30   2              {
+  31   3                  while (--j);
+  32   3              } while (--i);
+  33   2          }
+  34   1      }
+  35          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     18    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

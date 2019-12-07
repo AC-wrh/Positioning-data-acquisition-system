@@ -1,0 +1,234 @@
+C51 COMPILER V9.54   GPS                                                                   12/07/2019 22:39:07 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE GPS
+OBJECT MODULE PLACED IN .\Objects\gps.obj
+COMPILER INVOKED BY: D:\DevelopmentTools\Keil\C51\BIN\C51.EXE ..\modules\src\gps.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR
+                    -(..\core;..\modules\inc;..\system\inc) DEBUG OBJECTEXTEND PRINT(.\Listings\gps.lst) OBJECT(.\Objects\gps.obj)
+
+line level    source
+
+   1          /*
+   2           * @Descripttion: GPS&BPS的数据处理
+   3           * @version: 1.0
+   4           * @Author: adol
+   5           * @Date: 2019-11-19 12:45:39
+   6           * @LastEditors: adol
+   7           * @LastEditTime: 2019-12-07 22:37:09
+   8           */
+   9          
+  10          #include "intrins.h"
+  11          #include "core.h"
+  12          
+  13          bit flag_date_ov = 0;    //日期进位标志位
+  14          unsigned char hour = 0, hour_high = 0, hour_low = 0;
+  15          unsigned char year = 0,month = 0, day = 0, year_high = 0,year_low = 0, month_high = 0, month_low = 0, day_
+             -high = 0, day_low = 0;
+  16          unsigned char max_day = 0;
+  17          unsigned char xdata gprmc_buffer[70];   //GPS+BPS的定位数据
+  18          
+  19          /**
+  20           * @name: leap_year_detection();
+  21           * @function: 检测传入年份是否为闰年
+  22           * @param { unsigned int } years -> 现今年份
+  23           * @return: 1 : 闰年; 0 : 平年
+  24           */
+  25          bit leap_year_detection(unsigned int years)
+  26          {
+  27   1          return (((years % 4) == 0) && ((years % 100) != 0)) || ((years % 400) == 0);
+  28   1      }
+  29          
+  30          /**
+  31           * @name: unsigned char get_max_day();
+  32           * @function: 获取当月日期最大值
+  33           * @param { unsigned char } month_value -> 现今月份
+  34           *        { unsigned int  } year_value  -> 现今年份
+  35           * @return: 返回当月日期最大值(max_day)
+  36           */
+  37          unsigned char get_max_day(unsigned char month_value, unsigned int year_value)
+  38          {
+  39   1          unsigned char days;
+  40   1          switch(month_value)
+  41   1          {
+  42   2              case 1:
+  43   2              case 3:
+  44   2              case 5:
+  45   2              case 7:
+  46   2              case 8:
+  47   2              case 10:
+  48   2              case 12:
+  49   2              {
+  50   3                  days = 31;
+  51   3              }
+  52   2              break;
+  53   2      
+C51 COMPILER V9.54   GPS                                                                   12/07/2019 22:39:07 PAGE 2   
+
+  54   2              case 2:
+  55   2              {
+  56   3                  //2月份比较特殊，需要根据是不是闰年来判断当月是28天还是29天
+  57   3                  days = leap_year_detection(year_value)? 29 : 28;
+  58   3              }
+  59   2              break;
+  60   2      
+  61   2              case 4:
+  62   2              case 6:
+  63   2              case 9:
+  64   2              case 11:
+  65   2              {
+  66   3                  days = 30;
+  67   3              }
+  68   2              break;
+  69   2              
+  70   2              default : break;
+  71   2          }
+  72   1          return(days);
+  73   1      }
+  74          
+  75          /*
+  76          GNRMC语句的基本格式：
+  77          $GNRMC,(1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12)*hh(CR)(LF)
+  78          (1) UTC时间， hhmmsshhmmss （时分秒）
+  79          (2) 定位状态， A= 有效定位， V= 无效定位
+  80          (3) 纬度 ddmm.mmm （度分）
+  81          (4) 纬度半球 N（北半球）或 S（南半球）
+  82          (5) 经度 dddmm.mm （度分）
+  83          (6) 经度半球 E（东经）或 W（西经）
+  84          (7) 地面速率（000.0~999.9 节）
+  85          (8) 地面航向（000.0~359.9 度，以真北方为参考基准）
+  86          (9) UTC日期，ddmmyy（日月年）
+  87          (10) 磁偏角（000.0~180.0度，前导位数不足则补0）
+  88          (11) 磁偏角方向，E（东）或 W（西）
+  89          (12) 模式指示（ A= 自主定位， D= 差分， E= 估算， N= 数据无效）
+  90          */
+  91          /**
+  92           * @name: get_position_data();
+  93           * @function: 对GPS+BPS的定位数据进行处理
+  94           * @param { void } 
+  95           * @return: none
+  96           */
+  97          void get_position_data(void)
+  98          {
+  99   1          unsigned char i;
+ 100   1      
+ 101   1          if(flag_gps_data_ok) //确定是否收到"GPRMC"这一帧数据
+ 102   1          {
+ 103   2              for(i = 0; i < 70 ; i++)
+ 104   2              {
+ 105   3                  gprmc_buffer[i] = RX_buffer[i];
+ 106   3              }
+ 107   2              
+ 108   2              /***** 时分秒 *****/
+ 109   2              hour = (gprmc_buffer[7] - 0x30) * 10 + (gprmc_buffer[8] - 0x30) + 8;  //将UTC时间转换到北京时间 即
+             -UTC+8
+ 110   2              if( hour >= 24 )    
+ 111   2              {
+ 112   3                  hour %= 24;     //获取当前Hour
+ 113   3                  flag_date_ov = 1;    //日期进位
+ 114   3              }
+C51 COMPILER V9.54   GPS                                                                   12/07/2019 22:39:07 PAGE 3   
+
+ 115   2              else
+ 116   2              {
+ 117   3                  flag_date_ov = 0;
+ 118   3              }
+ 119   2      
+ 120   2              hour_high = hour / 10 + 0x30;
+ 121   2              hour_low  = hour % 10 + 0x30;
+ 122   2      
+ 123   2              lcd12864_display_buffer[2][0] = hour_high;          //hour_high
+ 124   2              lcd12864_display_buffer[2][1] = hour_low;           //hour_low
+ 125   2              lcd12864_display_buffer[2][4] = gprmc_buffer[9];    //min_high
+ 126   2              lcd12864_display_buffer[2][5] = gprmc_buffer[10];   //min_low
+ 127   2              lcd12864_display_buffer[2][8] = gprmc_buffer[11];   //sec_high
+ 128   2              lcd12864_display_buffer[2][9] = gprmc_buffer[12];   //sec_low    
+ 129   2              
+ 130   2              /***** 经纬度 *****/
+ 131   2              lcd12864_display_buffer[1][0] = gprmc_buffer[20];   //纬度
+ 132   2              lcd12864_display_buffer[1][1] = gprmc_buffer[21];
+ 133   2              lcd12864_display_buffer[1][3] = gprmc_buffer[22];
+ 134   2              lcd12864_display_buffer[1][4] = gprmc_buffer[23];
+ 135   2              lcd12864_display_buffer[1][5] = gprmc_buffer[30];   // N || S
+ 136   2      
+ 137   2              lcd12864_display_buffer[1][7]  = gprmc_buffer[32];  //经度
+ 138   2              lcd12864_display_buffer[1][8]  = gprmc_buffer[33];
+ 139   2              lcd12864_display_buffer[1][9]  = gprmc_buffer[34];
+ 140   2              lcd12864_display_buffer[1][11] = gprmc_buffer[35];
+ 141   2              lcd12864_display_buffer[1][12] = gprmc_buffer[36];
+ 142   2              lcd12864_display_buffer[1][13] = gprmc_buffer[43];  // E || W
+ 143   2      
+ 144   2              /***** 年月日 *****/
+ 145   2              // day_high   = gprmc_buffer[57];
+ 146   2              // day_low    = gprmc_buffer[58];
+ 147   2              // month_high = gprmc_buffer[59];
+ 148   2              // month_low  = gprmc_buffer[60];
+ 149   2              // year_high  = gprmc_buffer[61];
+ 150   2              // year_low   = gprmc_buffer[62];
+ 151   2      
+ 152   2              // if (flag_date_ov == 1)
+ 153   2              // {
+ 154   2              //     day = (day_high - 0x30) * 10 + (day_low-0x30)+ 1;
+ 155   2              // }
+ 156   2              // else
+ 157   2              // {
+ 158   2              //     day = (day_high - 0x30) * 10 + (day_low - 0x30);
+ 159   2              // }
+ 160   2      
+ 161   2              // month = (month_high - 0x30) * 10 + (month_low - 0x30);
+ 162   2              // year = (year_high - 0x30) * 10 + (year_low - 0x30);
+ 163   2              
+ 164   2              // max_day = get_max_day(month, (2000 + year)); //获取当月天数最大值
+ 165   2              // if(day > max_day)
+ 166   2              // {
+ 167   2              //     day %= max_day;
+ 168   2              //     month += 1;
+ 169   2              //     if(month > 12)
+ 170   2              //     {
+ 171   2              //         month %= 12;
+ 172   2              //         year += 1;
+ 173   2              //     }
+ 174   2              // }
+ 175   2              
+ 176   2              // year_high = year / 10 + 0x30;
+C51 COMPILER V9.54   GPS                                                                   12/07/2019 22:39:07 PAGE 4   
+
+ 177   2              // year_low  = year % 10 + 0x30;
+ 178   2              // month_high = month / 10 + 0x30;
+ 179   2              // month_low  = month % 10 + 0x30;
+ 180   2              // day_high = day / 10 + 0x30;
+ 181   2              // day_low  = day % 10 + 0x30;
+ 182   2      
+ 183   2              // lcd12864_display_buffer[3][2]  = year_high;
+ 184   2              // lcd12864_display_buffer[3][3]  = year_low;
+ 185   2              // lcd12864_display_buffer[3][6]  = month_high;
+ 186   2              // lcd12864_display_buffer[3][7]  = month_low;
+ 187   2              // lcd12864_display_buffer[3][10] = day_high;
+ 188   2              // lcd12864_display_buffer[3][11] = day_low;
+ 189   2      
+ 190   2              /***** code *****/
+ 191   2      
+ 192   2              lcd12864_display_buffer[3][2]  = gprmc_buffer[61];
+ 193   2              lcd12864_display_buffer[3][3]  = gprmc_buffer[62];
+ 194   2              lcd12864_display_buffer[3][6]  = gprmc_buffer[59];
+ 195   2              lcd12864_display_buffer[3][7]  = gprmc_buffer[60];
+ 196   2              lcd12864_display_buffer[3][10] = gprmc_buffer[57];
+ 197   2              lcd12864_display_buffer[3][11] = gprmc_buffer[58];
+ 198   2              
+ 199   2              /***** code *****/
+ 200   2              flag_lcd12864_display_ok = 0;
+ 201   2          }
+ 202   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    407    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =     83    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      1    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

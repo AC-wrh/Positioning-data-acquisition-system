@@ -1,0 +1,1 @@
+"..\modules\src\lcd12864.c" LARGE OPTIMIZE (8,SPEED) BROWSE INCDIR(..\core;..\modules\inc;..\system\inc) DEBUG OBJECTEXTEND PRINT(.\Listings\lcd12864.lst) OBJECT(.\Objects\lcd12864.obj)

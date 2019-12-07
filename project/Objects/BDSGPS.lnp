@@ -1,0 +1,7 @@
+".\Objects\main.obj",
+".\Objects\gps.obj",
+".\Objects\lcd12864.obj",
+".\Objects\delay.obj",
+".\Objects\uart.obj" 
+TO ".\Objects\BDSGPS" 
+PRINT(".\Listings\BDSGPS.m51") RAMSIZE(256) 
