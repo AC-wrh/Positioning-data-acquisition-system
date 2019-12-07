@@ -1,0 +1,2 @@
+# Positioning-data-acquisition-system
+基于STC12C5A60S2的定位数据信息采集系统，采集后的数据将通过LCD12864显示出来
